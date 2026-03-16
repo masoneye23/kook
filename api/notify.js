@@ -3,15 +3,8 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (req.method !== 'POST') { res.status(405).end(); return; }
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
@@ -19,37 +12,41 @@ module.exports = async (req, res) => {
     const Phone = body.Phone || '—';
     const org   = body.org   || '—';
     const car   = body.car   || '—';
-
-    const now = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+    const now   = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
 
     const text = [
-      '🚗 *Новая заявка на лизинг*',
-      '',
+      '🚗 *Новая заявка на лизинг*', '',
       `👤 *Имя:* ${Name}`,
       `📞 *Телефон:* ${Phone}`,
       `🏢 *Организация:* ${org}`,
-      `🚘 *Автомобиль:* ${car}`,
-      '',
-      `🕐 *Время:* ${now} МСК`,
-      '',
+      `🚘 *Автомобиль:* ${car}`, '',
+      `🕐 *Время:* ${now} МСК`, '',
       '⚡️ Перезвони в течение 15 минут!'
     ].join('\n');
 
-    const tgRes = await fetch(
-      `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: process.env.CHAT_ID,
-          text,
-          parse_mode: 'Markdown'
-        })
-      }
-    );
+    // Telegram
+    await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: process.env.CHAT_ID, text, parse_mode: 'Markdown' })
+    });
 
-    const tgData = await tgRes.json();
-    res.status(200).json({ ok: tgData.ok });
+    // Битрикс24
+    const b24 = new URLSearchParams();
+    b24.append('fields[TITLE]', `Лизинг авто — ${car}`);
+    b24.append('fields[NAME]', Name);
+    b24.append('fields[PHONE][0][VALUE]', Phone);
+    b24.append('fields[PHONE][0][VALUE_TYPE]', 'WORK');
+    b24.append('fields[COMMENTS]', `Организация: ${org}\nАвтомобиль: ${car}\nИсточник: сайт`);
+    b24.append('fields[SOURCE_ID]', 'WEB');
+    b24.append('fields[STATUS_ID]', 'NEW');
+
+    await fetch(`${process.env.B24_URL}crm.lead.add.json`, {
+      method: 'POST',
+      body: b24
+    });
+
+    res.status(200).json({ ok: true });
 
   } catch (err) {
     console.error(err);
