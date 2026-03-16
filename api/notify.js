@@ -1,13 +1,20 @@
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', '*');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
 
   try {
-    const body = req.body || {};
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const Name  = body.Name  || '—';
     const Phone = body.Phone || '—';
     const org   = body.org   || '—';
@@ -42,16 +49,10 @@ module.exports = async (req, res) => {
     );
 
     const tgData = await tgRes.json();
-
-    if (!tgData.ok) {
-      console.error('TG error:', tgData);
-      return res.status(500).json({ error: tgData.description });
-    }
-
-    return res.status(200).json({ ok: true });
+    res.status(200).json({ ok: tgData.ok });
 
   } catch (err) {
-    console.error('Error:', err);
-    return res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 };
